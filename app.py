@@ -1,118 +1,127 @@
-# app.py
-from flask import Flask, request, send_file, jsonify, render_template
-import os
-import subprocess
-import uuid
-import imageio_ffmpeg as ffmpeg
-import tempfile
-import traceback
+// ================================
+// Shopee Video Factory JS - Versão Final
+// ================================
 
-app = Flask(__name__)
+const form = document.getElementById("form")
+const bar = document.getElementById("bar")
+const results = document.getElementById("results")
+const shopeeBtn = document.getElementById("shopee")
+const previewVoiceBtn = document.getElementById("previewVoice")
+const voicePlayer = document.getElementById("voicePlayer")
+let shopeeMode = false
 
-# -------------------------
-# Pastas temporárias Railway
-# -------------------------
-TMP_DIR = tempfile.gettempdir()
-UPLOAD_FOLDER = os.path.join(TMP_DIR, "uploads")
-OUTPUT_FOLDER = os.path.join(TMP_DIR, "outputs")
-PREVIEW_FOLDER = os.path.join(TMP_DIR, "previews")
+shopeeBtn.addEventListener("click", () => {
+    shopeeMode = !shopeeMode
+    shopeeBtn.innerText = shopeeMode ? "⚡ Modo Shopee ATIVO" : "⚡ Modo Shopee"
+})
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-os.makedirs(PREVIEW_FOLDER, exist_ok=True)
+// -------------------
+// Preview de voz (Edge TTS)
+// -------------------
+previewVoiceBtn.addEventListener("click", async () => {
+    const voice = document.querySelector("select[name='voice']").value
+    const text = document.querySelector("textarea[name='text']").value
 
-# -------------------------
-# Rotas
-# -------------------------
-@app.route("/")
-def index():
-    return render_template("index.html")  # mantém seu HTML
+    if (!text.trim()) {
+        alert("Digite algum texto para a narração")
+        return
+    }
 
-# Preview de voz (narração)
-@app.route("/preview-voice", methods=["POST"])
-def preview_voice():
-    try:
-        voice = request.form.get("voice")
-        text = request.form.get("text", "Olá")  # Texto default se estiver vazio
+    const data = new FormData()
+    data.append("voice", voice)
+    data.append("text", text)
 
-        # Aqui você implementaria a síntese de voz com Azure/TTS/etc
-        # Para exemplo simples, apenas retornamos um arquivo dummy
-        preview_path = os.path.join(TMP_DIR, f"preview_{uuid.uuid4()}.wav")
-        # Gera arquivo WAV dummy (silêncio)
-        with open(preview_path, "wb") as f:
-            f.write(b"\0" * 44100)  # 1s de silêncio
-        return send_file(preview_path, mimetype="audio/wav")
-    except Exception as e:
-        print(traceback.format_exc())
-        return f"Erro interno: {e}", 500
+    try {
+        const response = await fetch("/preview-voice", { method: "POST", body: data })
+        if (!response.ok) {
+            alert("Erro ao gerar prévia da voz")
+            return
+        }
+        const blob = await response.blob()
+        const audioURL = URL.createObjectURL(blob)
+        voicePlayer.src = audioURL
+        voicePlayer.style.display = "block"
+        voicePlayer.play()
+    } catch (err) {
+        console.error(err)
+        alert("Erro ao gerar prévia da voz")
+    }
+})
 
-# Processamento de vídeo
-@app.route("/process", methods=["POST"])
-def process():
-    try:
-        if "file" not in request.files:
-            return "Nenhum arquivo enviado", 400
+// -------------------
+// Envio de vídeos e processamento
+// -------------------
+form.addEventListener("submit", async (e) => {
+    e.preventDefault()
+    bar.style.width = "10%"
+    results.innerHTML = ""
 
-        files = request.files.getlist("file")  # suporta múltiplos vídeos
-        shopeeMode = request.form.get("shopeeMode") == "true"
-        resolution = request.form.get("resolution", None)
-        cut_audio = "cutAudio" in request.form
-        text = request.form.get("text", "")
-        voice = request.form.get("voice", None)
+    const videoInput = document.getElementById("videoInput")
+    if (!videoInput.files.length) {
+        alert("Selecione pelo menos um vídeo")
+        return
+    }
 
-        ffmpeg_path = ffmpeg.get_ffmpeg_exe()
-        output_files = []
+    const data = new FormData()
+    for (let file of videoInput.files) data.append("file", file)
+    data.append("shopeeMode", shopeeMode)
+    data.append("text", document.querySelector("textarea[name='text']").value)
+    data.append("voice", document.querySelector("select[name='voice']").value)
+    data.append("resolution", document.querySelector("select[name='resolution']").value)
+    if (document.getElementById("cutAudio").checked) data.append("cutAudio", "true")
 
-        for file in files:
-            if file.filename == "":
-                continue
-            unique_id = str(uuid.uuid4())
-            input_path = os.path.join(UPLOAD_FOLDER, f"{unique_id}_{file.filename}")
-            output_path = os.path.join(OUTPUT_FOLDER, f"processed_{unique_id}_{file.filename}")
+    try {
+        const response = await fetch("/process", { method: "POST", body: data })
+        bar.style.width = "70%"
+        if (!response.ok) {
+            const text = await response.text()
+            alert(text || "Erro ao processar vídeos")
+            bar.style.width = "0%"
+            return
+        }
 
-            file.save(input_path)
+        // Recebe o vídeo processado (blob)
+        const blob = await response.blob()
+        const url = URL.createObjectURL(blob)
 
-            # Monta comando FFmpeg
-            cmd = [ffmpeg_path, "-y", "-i", input_path]
+        // Cria preview e link de download
+        const video = document.createElement("video")
+        video.src = url
+        video.controls = true
+        video.width = 300
 
-            # Ajuste de resolução
-            if resolution:
-                width, height = resolution.split("x")
-                cmd += ["-vf", f"scale={width}:{height}"]
+        const link = document.createElement("a")
+        link.href = url
+        link.download = "video_processado.mp4"
+        link.innerText = "⬇ Baixar"
+        link.style.display = "block"
 
-            # Codec
-            cmd += ["-c:v", "libx264", "-c:a", "aac"]
+        results.appendChild(video)
+        results.appendChild(link)
 
-            # Narração (dummy placeholder)
-            if voice and text.strip():
-                # Aqui você adicionaria a narração real
-                pass  # placeholder
+        // -------------------
+        // Botão "Baixar Todos"
+        // -------------------
+        const downloadAllBtn = document.createElement("button")
+        downloadAllBtn.innerText = "Baixar Todos"
+        downloadAllBtn.type = "button"
+        downloadAllBtn.style.marginTop = "10px"
+        downloadAllBtn.onclick = () => {
+            const videos = results.querySelectorAll("video")
+            videos.forEach((vid, i) => {
+                const a = document.createElement("a")
+                a.href = vid.src
+                a.download = `video_processado_${i+1}.mp4`
+                a.click()
+            })
+        }
+        results.appendChild(downloadAllBtn)
 
-            # Se cortar áudio
-            if cut_audio:
-                cmd += ["-shortest"]
+        bar.style.width = "100%"
 
-            cmd += [output_path]
-
-            subprocess.run(cmd, check=True)
-            output_files.append(output_path)
-
-            # Limpeza do input
-            if os.path.exists(input_path):
-                os.remove(input_path)
-
-        # Para simplificar, retornamos o **primeiro vídeo processado** como blob
-        if output_files:
-            return send_file(output_files[0], as_attachment=True)
-
-        return "Nenhum vídeo processado", 400
-
-    except Exception as e:
-        print(traceback.format_exc())
-        return f"Erro interno: {e}", 500
-
-# -------------------------
-# Inicialização
-# -------------------------
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    } catch (err) {
+        console.error(err)
+        alert("Erro ao enviar vídeos")
+        bar.style.width = "0%"
+    }
+})

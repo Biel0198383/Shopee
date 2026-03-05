@@ -1,128 +1,128 @@
-# ================================
-# Shopee Video Factory JS - Versão Final
-# ================================
+from flask import Flask, request, send_file, render_template
+import os
+import uuid
+import subprocess
+import tempfile
+import traceback
+import edge_tts  # Edge TTS para gerar áudio
 
-const form = document.getElementById("form")
-const bar = document.getElementById("bar")
-const results = document.getElementById("results")
-const shopeeBtn = document.getElementById("shopee")
-const previewVoiceBtn = document.getElementById("previewVoice")
-const voicePlayer = document.getElementById("voicePlayer")
-let shopeeMode = false
+app = Flask(__name__)
 
-shopeeBtn.addEventListener("click", () => {
-    shopeeMode = !shopeeMode
-    shopeeBtn.innerText = shopeeMode ? "⚡ Modo Shopee ATIVO" : "⚡ Modo Shopee"
-})
+# -------------------------
+# Pastas temporárias Railway
+# -------------------------
+TMP_DIR = tempfile.gettempdir()
+UPLOAD_FOLDER = os.path.join(TMP_DIR, "uploads")
+OUTPUT_FOLDER = os.path.join(TMP_DIR, "outputs")
+PREVIEW_FOLDER = os.path.join(TMP_DIR, "previews")
 
-// -------------------
-// Preview de voz (Edge TTS)
-// -------------------
-previewVoiceBtn.addEventListener("click", async () => {
-    const voice = document.querySelector("select[name='voice']").value
-    const text = document.querySelector("textarea[name='text']").value
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+os.makedirs(PREVIEW_FOLDER, exist_ok=True)
 
-    if (!text.trim()) {
-        alert("Digite algum texto para a narração")
-        return
-    }
+import imageio_ffmpeg as ffmpeg
+FFMPEG_PATH = ffmpeg.get_ffmpeg_exe()
 
-    const data = new FormData()
-    data.append("voice", voice)
-    data.append("text", text)
+# -------------------------
+# Rotas
+# -------------------------
+@app.route("/")
+def index():
+    return render_template("index.html")  # Mantém seu HTML
 
-    try {
-        const response = await fetch("/preview-voice", { method: "POST", body: data })
-        if (!response.ok) {
-            alert("Erro ao gerar prévia da voz")
-            return
-        }
-        const blob = await response.blob()
-        const audioURL = URL.createObjectURL(blob)
-        voicePlayer.src = audioURL
-        voicePlayer.style.display = "block"
-        voicePlayer.play()
-    } catch (err) {
-        console.error(err)
-        alert("Erro ao gerar prévia da voz")
-    }
-})
+# Preview de voz
+@app.route("/preview-voice", methods=["POST"])
+def preview_voice():
+    try:
+        text = request.form.get("text", "")
+        voice = request.form.get("voice", "pt-BR-FranciscaNeural")
+        preview_path = os.path.join(PREVIEW_FOLDER, f"preview_{uuid.uuid4()}.mp3")
 
-// -------------------
-// Envio de vídeos e processamento
-// -------------------
-form.addEventListener("submit", async (e) => {
-    e.preventDefault()
-    bar.style.width = "10%"
-    results.innerHTML = ""
+        if not text.strip():
+            return "Nenhum texto enviado", 400
 
-    const videoInput = document.getElementById("videoInput")
-    if (!videoInput.files.length) {
-        alert("Selecione pelo menos um vídeo")
-        return
-    }
+        communicate = edge_tts.Communicate(text, voice)
+        import asyncio
+        asyncio.run(communicate.save(preview_path))
 
-    const data = new FormData()
-    for (let file of videoInput.files) data.append("file", file)
-    data.append("shopeeMode", shopeeMode)
-    data.append("text", document.querySelector("textarea[name='text']").value)
-    data.append("voice", document.querySelector("select[name='voice']").value)
-    data.append("resolution", document.querySelector("select[name='resolution']").value)
-    if (document.getElementById("cutAudio").checked) data.append("cutAudio", "true")
+        return send_file(preview_path, mimetype="audio/mpeg")
+    except Exception as e:
+        print(traceback.format_exc())
+        return f"Erro interno: {e}", 500
 
-    try {
-        const response = await fetch("/process", { method: "POST", body: data })
-        bar.style.width = "70%"
-        if (!response.ok) {
-            const text = await response.text()
-            alert(text || "Erro ao processar vídeos")
-            bar.style.width = "0%"
-            return
-        }
+# Processamento de vídeo
+@app.route("/process", methods=["POST"])
+def process():
+    try:
+        files = request.files.getlist("file")
+        if not files:
+            return "Nenhum arquivo enviado", 400
 
-        // Recebe o vídeo processado (blob)
-        const blob = await response.blob()
-        const url = URL.createObjectURL(blob)
+        shopeeMode = request.form.get("shopeeMode") == "true"
+        resolution = request.form.get("resolution")
+        cut_audio = "cutAudio" in request.form
+        text = request.form.get("text", "")
+        voice = request.form.get("voice", None)
 
-        // Cria preview e link de download
-        const video = document.createElement("video")
-        video.src = url
-        video.controls = true
-        video.width = 300
+        output_files = []
 
-        const link = document.createElement("a")
-        link.href = url
-        link.download = "video_processado.mp4"
-        link.innerText = "⬇ Baixar"
-        link.style.display = "block"
+        for file in files:
+            if not file.filename:
+                continue
 
-        results.appendChild(video)
-        results.appendChild(link)
+            unique_id = str(uuid.uuid4())
+            input_path = os.path.join(UPLOAD_FOLDER, f"{unique_id}_{file.filename}")
+            output_path = os.path.join(OUTPUT_FOLDER, f"processed_{unique_id}_{file.filename}")
 
-        // -------------------
-        // Botão "Baixar Todos"
-        // -------------------
-        const downloadAllBtn = document.createElement("button")
-        downloadAllBtn.innerText = "Baixar Todos"
-        downloadAllBtn.type = "button"
-        downloadAllBtn.style.marginTop = "10px"
-        downloadAllBtn.onclick = () => {
-            const videos = results.querySelectorAll("video")
-            videos.forEach((vid, i) => {
-                const a = document.createElement("a")
-                a.href = vid.src
-                a.download = `video_processado_${i+1}.mp4`
-                a.click()
-            })
-        }
-        results.appendChild(downloadAllBtn)
+            file.save(input_path)
 
-        bar.style.width = "100%"
+            # Monta comando FFmpeg
+            cmd = [FFMPEG_PATH, "-y", "-i", input_path]
 
-    } catch (err) {
-        console.error(err)
-        alert("Erro ao enviar vídeos")
-        bar.style.width = "0%"
-    }
-})
+            # Resolução
+            if resolution:
+                width, height = resolution.split("x")
+                cmd += ["-vf", f"scale={width}:{height}"]
 
+            # Codec
+            cmd += ["-c:v", "libx264", "-c:a", "aac"]
+
+            # Narração
+            if voice and text.strip():
+                tts_file = os.path.join(PREVIEW_FOLDER, f"tts_{uuid.uuid4()}.mp3")
+                communicate = edge_tts.Communicate(text, voice)
+                import asyncio
+                asyncio.run(communicate.save(tts_file))
+                # Adiciona TTS ao vídeo
+                cmd = [FFMPEG_PATH, "-y", "-i", input_path, "-i", tts_file,
+                       "-c:v", "libx264", "-c:a", "aac", "-shortest", output_path]
+
+            # Corte de áudio
+            elif cut_audio:
+                cmd += ["-shortest", output_path]
+            else:
+                cmd += [output_path]
+
+            # Executa FFmpeg
+            subprocess.run(cmd, check=True)
+            output_files.append(output_path)
+
+            # Limpeza input
+            if os.path.exists(input_path):
+                os.remove(input_path)
+
+        # Retorna o primeiro vídeo processado (para download direto)
+        if output_files:
+            return send_file(output_files[0], as_attachment=True)
+
+        return "Nenhum vídeo processado", 400
+
+    except Exception as e:
+        print(traceback.format_exc())
+        return f"Erro interno: {e}", 500
+
+# -------------------------
+# Inicialização
+# -------------------------
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

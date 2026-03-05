@@ -4,12 +4,14 @@ import uuid
 import subprocess
 import tempfile
 import traceback
-import edge_tts  # Edge TTS para gerar áudio
+import edge_tts
+import asyncio
+import imageio_ffmpeg as ffmpeg
 
 app = Flask(__name__)
 
 # -------------------------
-# Pastas temporárias Railway
+# Pastas temporárias
 # -------------------------
 TMP_DIR = tempfile.gettempdir()
 UPLOAD_FOLDER = os.path.join(TMP_DIR, "uploads")
@@ -20,7 +22,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 os.makedirs(PREVIEW_FOLDER, exist_ok=True)
 
-import imageio_ffmpeg as ffmpeg
 FFMPEG_PATH = ffmpeg.get_ffmpeg_exe()
 
 # -------------------------
@@ -28,7 +29,7 @@ FFMPEG_PATH = ffmpeg.get_ffmpeg_exe()
 # -------------------------
 @app.route("/")
 def index():
-    return render_template("index.html")  # Mantém seu HTML
+    return render_template("index.html")
 
 # Preview de voz
 @app.route("/preview-voice", methods=["POST"])
@@ -42,7 +43,6 @@ def preview_voice():
             return "Nenhum texto enviado", 400
 
         communicate = edge_tts.Communicate(text, voice)
-        import asyncio
         asyncio.run(communicate.save(preview_path))
 
         return send_file(preview_path, mimetype="audio/mpeg")
@@ -59,7 +59,6 @@ def process():
             return "Nenhum arquivo enviado", 400
 
         shopeeMode = request.form.get("shopeeMode") == "true"
-        resolution = request.form.get("resolution")
         cut_audio = "cutAudio" in request.form
         text = request.form.get("text", "")
         voice = request.form.get("voice", None)
@@ -76,34 +75,28 @@ def process():
 
             file.save(input_path)
 
-            # Monta comando FFmpeg
+            # FFmpeg comando base: força 720p + bitrate 1.5M
             cmd = [FFMPEG_PATH, "-y", "-i", input_path]
 
-            # Resolução
-            if resolution:
-                width, height = resolution.split("x")
-                cmd += ["-vf", f"scale={width}:{height}"]
+            # Sempre escala para 720p vertical
+            cmd += ["-vf", "scale=720:1280"]
 
-            # Codec
-            cmd += ["-c:v", "libx264", "-c:a", "aac"]
+            # Codec + bitrate
+            cmd += ["-c:v", "libx264", "-b:v", "1.5M", "-c:a", "aac"]
 
-            # Narração
+            # Adiciona TTS se houver
             if voice and text.strip():
                 tts_file = os.path.join(PREVIEW_FOLDER, f"tts_{uuid.uuid4()}.mp3")
                 communicate = edge_tts.Communicate(text, voice)
-                import asyncio
                 asyncio.run(communicate.save(tts_file))
-                # Adiciona TTS ao vídeo
+                # Sobrepõe áudio do vídeo com TTS
                 cmd = [FFMPEG_PATH, "-y", "-i", input_path, "-i", tts_file,
-                       "-c:v", "libx264", "-c:a", "aac", "-shortest", output_path]
-
-            # Corte de áudio
+                       "-c:v", "libx264", "-b:v", "1.5M", "-c:a", "aac", "-shortest", output_path]
             elif cut_audio:
                 cmd += ["-shortest", output_path]
             else:
                 cmd += [output_path]
 
-            # Executa FFmpeg
             subprocess.run(cmd, check=True)
             output_files.append(output_path)
 
@@ -111,7 +104,7 @@ def process():
             if os.path.exists(input_path):
                 os.remove(input_path)
 
-        # Retorna o primeiro vídeo processado (para download direto)
+        # Retorna o primeiro vídeo processado
         if output_files:
             return send_file(output_files[0], as_attachment=True)
 

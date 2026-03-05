@@ -15,17 +15,18 @@
     <form id="form">
 
         <div class="upload">
-            <input type="file" name="videos" multiple required>
+            <!-- Ajustado name para "file" para bater com Flask -->
+            <input type="file" name="file" multiple required id="videoInput">
         </div>
 
         <br>
 
-        <textarea name="text" placeholder="Texto da narração (deixe vazio se não quiser voz)"></textarea>
+        <textarea name="text" placeholder="Texto da narração (deixe vazio se não quiser voz)" id="textInput"></textarea>
 
         <br><br>
 
         <!-- 🔥 SELETOR DE VOZ -->
-        <select name="voice">
+        <select name="voice" id="voiceSelect">
 
             <optgroup label="🇧🇷 Português Brasil">
                 <option value="pt-BR-FranciscaNeural">Francisca</option>
@@ -61,7 +62,7 @@
         <br><br>
 
         <!-- 📐 RESOLUÇÃO -->
-        <select name="resolution">
+        <select name="resolution" id="resolutionSelect">
             <option value="">Manter resolução original</option>
             <option value="1080x1920">1080x1920 (Vertical)</option>
             <option value="1920x1080">1920x1080 (Horizontal)</option>
@@ -72,7 +73,7 @@
 
         <!-- ✂️ CORTE -->
         <label>
-            <input type="checkbox" name="cutAudio">
+            <input type="checkbox" name="cutAudio" id="cutAudio">
             Cortar vídeo na duração da narração
         </label>
 

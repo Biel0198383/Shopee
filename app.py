@@ -1,125 +1,56 @@
+# app.py
+from flask import Flask, request, jsonify, send_file
 import os
-import uuid
 import subprocess
-from flask import Flask, render_template, request, jsonify, send_from_directory
+import imageio_ffmpeg as ffmpeg
 
 app = Flask(__name__)
 
 UPLOAD_FOLDER = "uploads"
 OUTPUT_FOLDER = "outputs"
-AUDIO_FOLDER = "audio"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-os.makedirs(AUDIO_FOLDER, exist_ok=True)
-
 
 @app.route("/")
 def index():
-    return render_template("index.html")
-
+    return "Bem-vindo ao app!"
 
 @app.route("/process", methods=["POST"])
 def process():
+    if 'file' not in request.files:
+        return "Nenhum arquivo enviado", 400
 
-    files = request.files.getlist("videos")
-    text = request.form.get("text")
-    voice = request.form.get("voice")
-    resolution = request.form.get("resolution")
+    file = request.files['file']
+    if file.filename == "":
+        return "Arquivo sem nome", 400
 
-    results = []
+    input_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    output_filename = f"processed_{file.filename}"
+    output_path = os.path.join(OUTPUT_FOLDER, output_filename)
 
-    audio_file = None
+    # Salva arquivo enviado
+    file.save(input_path)
 
-    if text and voice:
+    # Pega o caminho do executável FFmpeg baixado pelo Python
+    ffmpeg_path = ffmpeg.get_ffmpeg_exe()
 
-        audio_file = os.path.join(AUDIO_FOLDER, f"{uuid.uuid4()}.mp3")
+    # Monta comando FFmpeg (mantendo seu fluxo atual)
+    cmd = [
+        ffmpeg_path,
+        "-y",
+        "-i", input_path,
+        output_path
+    ]
 
-        subprocess.run([
-            "edge-tts",
-            "--voice", voice,
-            "--text", text,
-            "--write-media", audio_file
-        ])
+    # Executa FFmpeg com tratamento de erro
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        return f"Erro ao processar vídeo: {e}", 500
 
-    for file in files:
-
-        video_id = str(uuid.uuid4())
-
-        input_path = os.path.join(UPLOAD_FOLDER, video_id + ".mp4")
-        output_path = os.path.join(OUTPUT_FOLDER, video_id + ".mp4")
-
-        file.save(input_path)
-
-        cmd = ["ffmpeg", "-y", "-i", input_path]
-
-        if audio_file:
-            cmd += ["-i", audio_file, "-map", "0:v", "-map", "1:a"]
-        else:
-            cmd += ["-map", "0:v", "-map", "0:a?"]
-
-        cmd += [
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-c:a", "aac"
-        ]
-
-        if resolution:
-            w, h = resolution.split("x")
-
-            cmd += [
-                "-vf",
-                f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
-            ]
-
-        cmd.append(output_path)
-
-        subprocess.run(cmd)
-
-        results.append({
-            "file": video_id + ".mp4"
-        })
-
-    return jsonify(results)
-
-
-@app.route("/download/<filename>")
-def download(filename):
-    return send_from_directory(OUTPUT_FOLDER, filename, as_attachment=True)
-
-
-@app.route("/preview-voice", methods=["POST"])
-def preview_voice():
-
-    data = request.get_json()
-
-    text = data.get("text", "Teste de voz")
-    voice = data.get("voice")
-
-    audio_file = os.path.join(AUDIO_FOLDER, "preview.mp3")
-
-    subprocess.run([
-        "edge-tts",
-        "--voice", voice,
-        "--text", text,
-        "--write-media", audio_file
-    ])
-
-    return jsonify({
-        "url": "/audio/preview.mp3"
-    })
-
-
-@app.route("/audio/<filename>")
-def audio(filename):
-    return send_from_directory(AUDIO_FOLDER, filename)
-
+    # Retorna o vídeo processado
+    return send_file(output_path, as_attachment=True)
 
 if __name__ == "__main__":
-
-    port = int(os.environ.get("PORT", 5000))
-
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

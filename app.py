@@ -1,6 +1,6 @@
-// ================================
-// Shopee Video Factory JS - Versão Final
-// ================================
+# ================================
+# Shopee Video Factory JS - Versão Final
+# ================================
 
 const form = document.getElementById("form")
 const bar = document.getElementById("bar")
@@ -125,3 +125,4 @@ form.addEventListener("submit", async (e) => {
         bar.style.width = "0%"
     }
 })
+

@@ -31,7 +31,6 @@ def process():
 
     audio_file = None
 
-    # gerar narração
     if text and voice:
 
         audio_file = os.path.join(AUDIO_FOLDER, f"{uuid.uuid4()}.mp3")
@@ -46,6 +45,7 @@ def process():
     for file in files:
 
         video_id = str(uuid.uuid4())
+
         input_path = os.path.join(UPLOAD_FOLDER, video_id + ".mp4")
         output_path = os.path.join(OUTPUT_FOLDER, video_id + ".mp4")
 
@@ -91,8 +91,10 @@ def download(filename):
 @app.route("/preview-voice", methods=["POST"])
 def preview_voice():
 
-    text = request.json.get("text")
-    voice = request.json.get("voice")
+    data = request.get_json()
+
+    text = data.get("text", "Teste de voz")
+    voice = data.get("voice")
 
     audio_file = os.path.join(AUDIO_FOLDER, "preview.mp3")
 
@@ -103,7 +105,9 @@ def preview_voice():
         "--write-media", audio_file
     ])
 
-    return jsonify({"file": "preview.mp3"})
+    return jsonify({
+        "url": "/audio/preview.mp3"
+    })
 
 
 @app.route("/audio/<filename>")

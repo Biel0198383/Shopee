@@ -1,111 +1,51 @@
-const form = document.getElementById("form")
-const bar = document.getElementById("bar")
-const results = document.getElementById("results")
-const shopeeBtn = document.getElementById("shopee")
-const previewVoiceBtn = document.getElementById("previewVoice")
-const voicePlayer = document.getElementById("voicePlayer")
+const form = document.getElementById("form");
+const bar = document.getElementById("bar");
+const results = document.getElementById("results");
+const downloadAllBtn = document.getElementById("downloadAll");
 
-let shopeeMode = false
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const files = form.videos.files;
+    if (!files.length) return alert("Nenhum arquivo selecionado");
 
-shopeeBtn.addEventListener("click", ()=>{
-    shopeeMode = !shopeeMode
-    shopeeBtn.innerText = shopeeMode ? "⚡ Modo Shopee ATIVO" : "⚡ Modo Shopee"
-})
+    const formData = new FormData(form);
+    bar.style.width = "0%";
+    results.innerHTML = "";
 
-previewVoiceBtn.addEventListener("click", async ()=>{
-    const voice = document.querySelector("select[name='voice']").value
-    const text = document.querySelector("textarea[name='text']").value
+    const res = await fetch("/process", {
+        method: "POST",
+        body: formData
+    });
 
-    const data = new FormData()
-    data.append("voice", voice)
-    data.append("text", text)
+    const data = await res.json();
+    if(data.error) return alert(data.error);
 
-    const response = await fetch("/preview-voice", { method: "POST", body: data })
-    if(!response.ok){
-        alert("Erro ao gerar prévia da voz")
-        return
-    }
+    let html = "";
+    data.files.forEach(file=>{
+        html += `<div>${file} - <a href="/download/${file}">⬇️ Baixar</a></div>`;
+    });
+    results.innerHTML = html;
 
-    const blob = await response.blob()
-    const audioURL = URL.createObjectURL(blob)
-    voicePlayer.src = audioURL
-    voicePlayer.style.display = "block"
-    voicePlayer.play()
-})
-
-form.addEventListener("submit", async (e)=>{
-    e.preventDefault()
-    bar.style.width="10%"
-    results.innerHTML=""
-
-    const data = new FormData(form)
-    data.append("shopeeMode", shopeeMode)
-
-    const response = await fetch("/process",{ method:"POST", body:data })
-    bar.style.width="70%"
-
-    const files = await response.json()
-    if (!Array.isArray(files)) {
-        alert(files.error || "Erro ao processar vídeos")
-        bar.style.width="0%"
-        return
-    }
-
-    bar.style.width="100%"
-
-    results.innerHTML = ""
-    if (files.length === 1) {
-        const video = document.createElement("video")
-        video.src="/download?file="+files[0]
-        video.controls=true
-        video.width=300
-
-        const link = document.createElement("a")
-        link.href="/download?file="+files[0]
-        link.innerText="⬇ Baixar"
-        link.style.display="block"
-
-        results.appendChild(video)
-        results.appendChild(link)
-    } else {
-        const title = document.createElement("h3")
-        title.innerText = "Vídeos processados:"
-        results.appendChild(title)
-
-        files.forEach(file=>{
-            const container = document.createElement("div")
-            const checkbox = document.createElement("input")
-            checkbox.type = "checkbox"
-            checkbox.value = file
-            checkbox.classList.add("video-check")
-            const label = document.createElement("span")
-            label.innerText = " " + file
-            container.appendChild(checkbox)
-            container.appendChild(label)
-            results.appendChild(container)
-        })
-
-        const selectAllBtn = document.createElement("button")
-        selectAllBtn.innerText = "Selecionar Todos"
-        selectAllBtn.type = "button"
-        selectAllBtn.onclick = ()=> document.querySelectorAll(".video-check").forEach(cb=>cb.checked=true)
-
-        const downloadSelectedBtn = document.createElement("button")
-        downloadSelectedBtn.innerText = "Baixar Selecionados"
-        downloadSelectedBtn.type = "button"
-        downloadSelectedBtn.onclick = ()=> {
-            document.querySelectorAll(".video-check").forEach(cb=>{
-                if(cb.checked) window.open("/download?file="+cb.value,"_blank")
-            })
+    if(data.files.length>1){
+        downloadAllBtn.style.display="block";
+        downloadAllBtn.onclick = async ()=>{
+            const r = await fetch("/download_all", {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({files:data.files})
+            });
+            const blob = await r.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href=url;
+            a.download="videos.zip";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
         }
-
-        const downloadAllBtn = document.createElement("button")
-        downloadAllBtn.innerText = "Baixar Todos"
-        downloadAllBtn.type = "button"
-        downloadAllBtn.onclick = ()=> files.forEach(file=>window.open("/download?file="+file,"_blank"))
-
-        results.appendChild(selectAllBtn)
-        results.appendChild(downloadSelectedBtn)
-        results.appendChild(downloadAllBtn)
+    }else{
+        downloadAllBtn.style.display="none";
     }
-})
+
+    bar.style.width="100%";
+});

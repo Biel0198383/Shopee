@@ -1,11 +1,13 @@
-from flask import Flask, request, jsonify, send_file, render_template
+# app.py
+from flask import Flask, request, jsonify, send_from_directory, render_template
 import os
 import subprocess
 import uuid
 import imageio_ffmpeg as ffmpeg
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="templates")
 
+# Pastas
 UPLOAD_FOLDER = "/tmp/uploads"
 OUTPUT_FOLDER = "/tmp/outputs"
 
@@ -18,62 +20,85 @@ def index():
 
 @app.route("/process", methods=["POST"])
 def process():
-    files = request.files.getlist("videos")
-    if not files:
-        return jsonify({"error":"Nenhum arquivo enviado"}), 400
+    if 'videos' not in request.files:
+        return jsonify({"error": "Nenhum arquivo enviado"}), 400
 
-    shopeeMode = request.form.get("shopeeMode") == "true"
-    resolution = request.form.get("resolution")
-    cutAudio = request.form.get("cutAudio") == "true"
+    files = request.files.getlist('videos')
+    resolution = request.form.get("resolution") or ""
+    shopee_mode = request.form.get("shopeeMode") == "true"
 
-    output_files = []
+    processed_files = []
 
     for file in files:
-        filename = f"{uuid.uuid4()}_{file.filename}"
-        input_path = os.path.join(UPLOAD_FOLDER, filename)
+        if file.filename == "":
+            continue
+
+        # Cria nomes únicos
+        uid = str(uuid.uuid4())
+        input_path = os.path.join(UPLOAD_FOLDER, f"{uid}_{file.filename}")
         file.save(input_path)
 
-        output_filename = f"processed_{filename}"
+        output_filename = f"processed_{file.filename}"
         output_path = os.path.join(OUTPUT_FOLDER, output_filename)
 
-        cmd = [ffmpeg.get_ffmpeg_exe(), "-y", "-i", input_path]
+        # Pega o caminho do FFmpeg
+        ffmpeg_path = ffmpeg.get_ffmpeg_exe()
 
+        cmd = [ffmpeg_path, "-y", "-i", input_path]
+
+        # Resolução
         if resolution:
             width, height = resolution.split("x")
             cmd += ["-vf", f"scale={width}:{height}"]
 
-        cmd += ["-c:v", "libx264", "-c:a", "aac", output_path]
+        # Codec
+        cmd += ["-c:v", "libx264", "-c:a", "aac"]
 
         try:
-            # Timeout de 180s por vídeo pra evitar travar o worker
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=180)
-        except subprocess.TimeoutExpired:
-            return jsonify({"error": f"Tempo limite excedido para {file.filename}"}), 500
+            # Sem capturar stdout/stderr para não travar Gunicorn
+            subprocess.run(cmd, check=True, timeout=180)
+            processed_files.append(output_filename)
         except subprocess.CalledProcessError as e:
             return jsonify({"error": f"Erro ao processar {file.filename}: {e}"}), 500
+        except subprocess.TimeoutExpired:
+            return jsonify({"error": f"Tempo esgotado para {file.filename}"}), 500
 
-        output_files.append(output_filename)
+    return jsonify(processed_files)
 
-    return jsonify(output_files)
 
-@app.route("/preview/<filename>")
-def preview(filename):
-    return send_file(os.path.join(OUTPUT_FOLDER, filename))
-
+# Download individual
 @app.route("/download")
 def download():
-    file = request.args.get("file")
-    if not file:
-        return "Arquivo não encontrado", 404
-    path = os.path.join(OUTPUT_FOLDER, file)
-    if not os.path.exists(path):
-        return "Arquivo não existe", 404
-    return send_file(path, as_attachment=True)
+    filename = request.args.get("file")
+    if not filename:
+        return "Arquivo não especificado", 400
+    return send_from_directory(OUTPUT_FOLDER, filename, as_attachment=True)
 
+# Download todos
+@app.route("/download-all")
+def download_all():
+    import zipfile
+    from io import BytesIO
+
+    memory_file = BytesIO()
+    with zipfile.ZipFile(memory_file, 'w') as zf:
+        for f in os.listdir(OUTPUT_FOLDER):
+            path = os.path.join(OUTPUT_FOLDER, f)
+            zf.write(path, arcname=f)
+    memory_file.seek(0)
+    return send_from_directory(directory=OUTPUT_FOLDER, path=None, as_attachment=True, download_name="all_videos.zip")
+
+# Preview de voz placeholder (Edge TTS já faz o áudio)
 @app.route("/preview-voice", methods=["POST"])
 def preview_voice():
-    # Aqui você integra com Edge TTS ou outra TTS que usar
-    return "Preview de voz não implementado", 200
+    voice = request.form.get("voice")
+    # Aqui você conecta ao Edge TTS
+    # Retorna um mp3 de exemplo
+    from io import BytesIO
+    dummy_audio = BytesIO()
+    dummy_audio.write(b"")  # vazio só para placeholder
+    dummy_audio.seek(0)
+    return send_from_directory(".", "placeholder.mp3", as_attachment=True)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

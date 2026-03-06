@@ -1,4 +1,0 @@
-flask
-edge-tts
-gunicorn
-imageio-ffmpeg

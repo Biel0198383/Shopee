@@ -5,7 +5,6 @@ body{
     display:flex;
     justify-content:center;
 }
-
 .container{
     width:900px;
     background:#1e293b;
@@ -13,9 +12,7 @@ body{
     border-radius:20px;
     margin-top:50px;
 }
-
 h1{text-align:center;}
-
 .upload{
     border:2px dashed #3b82f6;
     padding:40px;
@@ -23,26 +20,15 @@ h1{text-align:center;}
     border-radius:15px;
     cursor:pointer;
 }
-
-textarea{
-    width:100%;
-    height:100px;
-    background:#334155;
-    border:none;
-    border-radius:10px;
-    color:white;
-    padding:10px;
-}
-
-select{
+textarea, select{
     width:100%;
     padding:10px;
     border-radius:10px;
     border:none;
     background:#334155;
     color:white;
+    margin-top:10px;
 }
-
 button{
     padding:12px 20px;
     border:none;
@@ -53,11 +39,7 @@ button{
     cursor:pointer;
     margin-top:10px;
 }
-
-button:hover{
-    background:#2563eb;
-}
-
+button:hover{background:#2563eb;}
 .progress{
     width:100%;
     height:10px;
@@ -65,7 +47,6 @@ button:hover{
     border-radius:10px;
     margin-top:20px;
 }
-
 .bar{
     height:10px;
     width:0%;

@@ -4,8 +4,8 @@ import uuid
 import subprocess
 import tempfile
 import traceback
-import edge_tts
 import asyncio
+import edge_tts
 import imageio_ffmpeg as ffmpeg
 
 app = Flask(__name__)
@@ -97,7 +97,17 @@ def process():
             else:
                 cmd += [output_path]
 
-            subprocess.run(cmd, check=True)
+            # -------------------------
+            # Executa FFmpeg com tratamento seguro
+            # -------------------------
+            try:
+                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=180)
+            except subprocess.TimeoutExpired:
+                return "Erro: processamento demorou demais e foi cancelado (timeout)", 500
+            except subprocess.CalledProcessError as e:
+                print("FFmpeg error:", e.stderr.decode())
+                return "Erro: falha ao processar vídeo (provável excesso de RAM ou vídeo grande demais)", 500
+
             output_files.append(output_path)
 
             # Limpeza input

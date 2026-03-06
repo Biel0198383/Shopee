@@ -15,20 +15,12 @@ shopeeBtn.addEventListener("click", ()=>{
 previewVoiceBtn.addEventListener("click", async ()=>{
     const voice = document.querySelector("select[name='voice']").value
     const text = document.querySelector("textarea[name='text']").value
-    if(!text.trim()){
-        alert("Digite algum texto para ouvir a voz")
-        return
-    }
 
     const data = new FormData()
     data.append("voice", voice)
     data.append("text", text)
 
-    const response = await fetch("/preview-voice", {
-        method: "POST",
-        body: data
-    })
-
+    const response = await fetch("/preview-voice", { method: "POST", body: data })
     if(!response.ok){
         alert("Erro ao gerar prévia da voz")
         return
@@ -49,23 +41,12 @@ form.addEventListener("submit", async (e)=>{
     const data = new FormData(form)
     data.append("shopeeMode", shopeeMode)
 
-    const response = await fetch("/process",{
-        method:"POST",
-        body:data
-    })
-
+    const response = await fetch("/process",{ method:"POST", body:data })
     bar.style.width="70%"
 
-    if(!response.ok){
-        const err = await response.json()
-        alert(err.error || "Erro ao processar vídeos")
-        bar.style.width="0%"
-        return
-    }
-
     const files = await response.json()
-    if(!Array.isArray(files)){
-        alert("Erro inesperado")
+    if (!Array.isArray(files)) {
+        alert(files.error || "Erro ao processar vídeos")
         bar.style.width="0%"
         return
     }
@@ -73,37 +54,58 @@ form.addEventListener("submit", async (e)=>{
     bar.style.width="100%"
 
     results.innerHTML = ""
-
-    files.forEach(file=>{
-        const container = document.createElement("div")
-        container.style.marginBottom="20px"
-
+    if (files.length === 1) {
         const video = document.createElement("video")
-        video.src = "/download?file="+file
-        video.controls = true
-        video.width = 400
-        container.appendChild(video)
+        video.src="/download?file="+files[0]
+        video.controls=true
+        video.width=300
 
         const link = document.createElement("a")
-        link.href = "/download?file="+file
-        link.innerText = "⬇ Baixar"
+        link.href="/download?file="+files[0]
+        link.innerText="⬇ Baixar"
         link.style.display="block"
-        link.style.marginTop="5px"
-        container.appendChild(link)
 
-        results.appendChild(container)
-    })
+        results.appendChild(video)
+        results.appendChild(link)
+    } else {
+        const title = document.createElement("h3")
+        title.innerText = "Vídeos processados:"
+        results.appendChild(title)
 
-    // Botão baixar todos
-    if(files.length > 1){
-        const downloadAllBtn = document.createElement("button")
-        downloadAllBtn.innerText = "⬇ Baixar Todos"
-        downloadAllBtn.type = "button"
-        downloadAllBtn.onclick = ()=>{
-            files.forEach(file=>{
-                window.open("/download?file="+file, "_blank")
+        files.forEach(file=>{
+            const container = document.createElement("div")
+            const checkbox = document.createElement("input")
+            checkbox.type = "checkbox"
+            checkbox.value = file
+            checkbox.classList.add("video-check")
+            const label = document.createElement("span")
+            label.innerText = " " + file
+            container.appendChild(checkbox)
+            container.appendChild(label)
+            results.appendChild(container)
+        })
+
+        const selectAllBtn = document.createElement("button")
+        selectAllBtn.innerText = "Selecionar Todos"
+        selectAllBtn.type = "button"
+        selectAllBtn.onclick = ()=> document.querySelectorAll(".video-check").forEach(cb=>cb.checked=true)
+
+        const downloadSelectedBtn = document.createElement("button")
+        downloadSelectedBtn.innerText = "Baixar Selecionados"
+        downloadSelectedBtn.type = "button"
+        downloadSelectedBtn.onclick = ()=> {
+            document.querySelectorAll(".video-check").forEach(cb=>{
+                if(cb.checked) window.open("/download?file="+cb.value,"_blank")
             })
         }
+
+        const downloadAllBtn = document.createElement("button")
+        downloadAllBtn.innerText = "Baixar Todos"
+        downloadAllBtn.type = "button"
+        downloadAllBtn.onclick = ()=> files.forEach(file=>window.open("/download?file="+file,"_blank"))
+
+        results.appendChild(selectAllBtn)
+        results.appendChild(downloadSelectedBtn)
         results.appendChild(downloadAllBtn)
     }
 })

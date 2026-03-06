@@ -1,8 +1,8 @@
-from flask import Flask, request, send_file, jsonify
+from flask import Flask, request, send_file, jsonify, render_template
 import os
 import subprocess
-import imageio_ffmpeg as ffmpeg
 import uuid
+import imageio_ffmpeg as ffmpeg
 
 app = Flask(__name__)
 
@@ -15,17 +15,24 @@ OUTPUT_FOLDER = "/tmp/outputs"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+# ====================
+# ROTAS
+# ====================
+
 @app.route("/")
 def index():
-    return send_file("index.html")
+    return render_template("index.html")  # index.html dentro de templates/
 
 @app.route("/process", methods=["POST"])
 def process():
-    files = request.files.getlist("file")
+    files = request.files.getlist("videos")  # note que o input name="videos"
     if not files:
         return jsonify({"error":"Nenhum arquivo enviado"}), 400
 
     processed_files = []
+
+    resolution = request.form.get("resolution", "")
+    w, h = (resolution.split("x") if resolution else (None, None))
 
     for file in files:
         if file.filename == "":
@@ -37,12 +44,7 @@ def process():
         output_path = os.path.join(OUTPUT_FOLDER, output_filename)
         file.save(input_path)
 
-        # Resolução
-        resolution = request.form.get("resolution", "")
-        scale = []
-        if resolution:
-            w, h = resolution.split("x")
-            scale = ["-vf", f"scale={w}:{h}"]
+        scale = ["-vf", f"scale={w}:{h}"] if w and h else []
 
         ffmpeg_path = ffmpeg.get_ffmpeg_exe()
         cmd = [
@@ -56,9 +58,9 @@ def process():
         ]
 
         try:
-            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=180)
             processed_files.append(output_filename)
-        except Exception as e:
+        except Exception:
             continue
 
     if not processed_files:
@@ -78,14 +80,12 @@ def download():
 
 @app.route("/preview-voice", methods=["POST"])
 def preview_voice():
-    # Aqui você integra Edge TTS
-    # Recebe text + voice
+    # Placeholder para integração com Edge TTS
     text = request.form.get("text","")
     voice = request.form.get("voice","pt-BR-FranciscaNeural")
-    # Placeholder: retorna dummy audio
     dummy_path = os.path.join(OUTPUT_FOLDER, "dummy.mp3")
     with open(dummy_path,"wb") as f:
-        f.write(b"")  # apenas arquivo vazio por enquanto
+        f.write(b"")  # arquivo vazio por enquanto
     return send_file(dummy_path, as_attachment=True)
 
 if __name__ == "__main__":

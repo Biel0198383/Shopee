@@ -7,54 +7,46 @@
 <body>
 <div class="container">
     <h1>🎬 Video Factory PRO</h1>
-
     <form id="form">
         <div class="upload">
             <input type="file" name="videos" multiple required>
         </div>
-
         <br>
-        <textarea name="text" placeholder="Texto da narração (opcional)"></textarea>
+        <textarea name="text" placeholder="Texto da narração (deixe vazio se não quiser voz)"></textarea>
         <br><br>
-
         <select name="voice">
             <optgroup label="🇧🇷 Português Brasil">
                 <option value="pt-BR-FranciscaNeural">Francisca</option>
                 <option value="pt-BR-AntonioNeural">Antonio</option>
                 <option value="pt-BR-ThalitaMultilingualNeural">Thalita</option>
             </optgroup>
+            <optgroup label="🇵🇹 Portugal">
+                <option value="pt-PT-DuarteNeural">Duarte</option>
+                <option value="pt-PT-RaquelNeural">Raquel</option>
+            </optgroup>
         </select>
-
         <br><br>
         <button type="button" id="previewVoice">🎧 Ouvir Voz</button>
         <audio id="voicePlayer" controls style="display:none;margin-top:10px;"></audio>
-
         <br><br>
         <select name="resolution">
-            <option value="">Manter resolução</option>
-            <option value="1080x1920">1080x1920 (Vertical)</option>
-            <option value="1920x1080">1920x1080 (Horizontal)</option>
+            <option value="">Manter resolução original</option>
+            <option value="1080x1920">1080x1920</option>
+            <option value="1920x1080">1920x1080</option>
             <option value="720x1280">720x1280</option>
         </select>
-
         <br><br>
         <label>
-            <input type="checkbox" name="cutAudio">
-            Cortar vídeo na duração da narração
+            <input type="checkbox" name="cutAudio"> Cortar vídeo na duração da narração
         </label>
-
         <br><br>
         <button type="submit">🚀 Processar Vídeos</button>
         <button type="button" id="shopee">⚡ Modo Shopee</button>
+        <button type="button" id="downloadAllBtn">⬇ Baixar Todos</button>
     </form>
-
-    <div class="progress">
-        <div class="bar" id="bar"></div>
-    </div>
-
+    <div class="progress"><div class="bar" id="bar"></div></div>
     <div id="results"></div>
 </div>
-
 <script src="/static/script.js"></script>
 </body>
 </html>

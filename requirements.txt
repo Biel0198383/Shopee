@@ -2,3 +2,4 @@ flask
 imageio-ffmpeg
 edge-tts
 gunicorn
+gevent

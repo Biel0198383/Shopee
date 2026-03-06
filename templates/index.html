@@ -12,68 +12,92 @@
 
     <h1>🎬 Video Factory PRO</h1>
 
+    <p style="color:orange; text-align:center;">
+        ⚠ Vídeos grandes podem não processar em 720p no Railway Free.
+    </p>
+
     <form id="form">
 
         <div class="upload">
-            <input type="file" name="file" multiple required id="videoInput">
+            <input type="file" name="file" multiple required>
         </div>
 
         <br>
 
-        <textarea name="text" placeholder="Texto da narração (deixe vazio se não quiser voz)" id="textInput"></textarea>
+        <textarea name="text" placeholder="Texto da narração (deixe vazio se não quiser voz)"></textarea>
 
         <br><br>
 
-        <select name="voice" id="voiceSelect">
+        <!-- 🔥 SELETOR DE VOZ -->
+        <select name="voice">
+
             <optgroup label="🇧🇷 Português Brasil">
                 <option value="pt-BR-FranciscaNeural">Francisca</option>
                 <option value="pt-BR-AntonioNeural">Antonio</option>
                 <option value="pt-BR-ThalitaMultilingualNeural">Thalita</option>
             </optgroup>
+
             <optgroup label="🇵🇹 Portugal">
                 <option value="pt-PT-DuarteNeural">Duarte</option>
                 <option value="pt-PT-RaquelNeural">Raquel</option>
             </optgroup>
+
             <optgroup label="🇺🇸 Inglês Natural">
                 <option value="en-US-AriaNeural">Aria</option>
                 <option value="en-US-JennyNeural">Jenny</option>
                 <option value="en-US-GuyNeural">Guy</option>
                 <option value="en-US-DavisNeural">Davis</option>
             </optgroup>
+
             <optgroup label="🇪🇸 Espanhol">
                 <option value="es-ES-ElviraNeural">Elvira</option>
                 <option value="es-ES-AlvaroNeural">Alvaro</option>
             </optgroup>
+
         </select>
 
         <br><br>
 
+        <!-- 🎧 PREVIEW -->
         <button type="button" id="previewVoice">🎧 Ouvir Voz</button>
         <audio id="voicePlayer" controls style="display:none;margin-top:10px;"></audio>
 
         <br><br>
 
-        <select name="resolution" id="resolutionSelect">
+        <!-- 📐 RESOLUÇÃO -->
+        <select name="resolution">
             <option value="">Manter resolução original</option>
             <option value="1080x1920">1080x1920 (Vertical)</option>
             <option value="1920x1080">1920x1080 (Horizontal)</option>
-            <option value="720x1280">720x1280</option>
+            <option value="720x1280" selected>720x1280 (Shopee / leve)</option>
         </select>
 
         <br><br>
 
+        <!-- ✂️ CORTE -->
         <label>
-            <input type="checkbox" name="cutAudio" id="cutAudio">
+            <input type="checkbox" name="cutAudio">
             Cortar vídeo na duração da narração
         </label>
 
         <br><br>
 
-        <button type="submit">🚀 Processar Vídeos</button>
-        <button type="button" id="shopee">⚡ Modo Shopee</button>
+        <!-- 🚀 BOTÕES -->
+        <button type="submit">
+            🚀 Processar Vídeos
+        </button>
+
+        <button type="button" id="shopee">
+            ⚡ Modo Shopee
+        </button>
+
+        <button type="button" id="downloadAllBtn">
+            ⬇ Baixar Todos
+        </button>
 
     </form>
 
+    <!-- 📊 BARRA -->
     <div class="progress">
         <div class="bar" id="bar"></div>
     </div>
@@ -83,5 +107,6 @@
 </div>
 
 <script src="/static/script.js"></script>
+
 </body>
 </html>
